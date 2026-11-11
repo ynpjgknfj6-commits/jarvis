@@ -15,6 +15,8 @@
  *   node bridge/server.mjs
  */
 
+// First, so the settings in .env.local are in place before any module reads them.
+import './env.mjs'
 import { WebSocketServer } from 'ws'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { displayServer } from './panels.mjs'
@@ -1313,6 +1315,12 @@ wss.on('connection', (socket) => {
   const session = query({
     prompt: userMessages(),
     options: {
+      // The agent's own environment, minus the bridge's ElevenLabs key. With
+      // writes on the agent has a shell, and a web page it reads could talk it
+      // into printing its environment; the key is only the bridge's business.
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(([name]) => name !== 'ELEVENLABS_API_KEY'),
+      ),
       // Everything Claude Code has configured, plus the HUD as an in-process
       // server. The HUD's handler closes over this socket, so a `display` call
       // lands on screen directly — which is also why this object is built per

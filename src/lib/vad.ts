@@ -1,4 +1,5 @@
 import { getMic } from './audio'
+import { BARGE_IN_TUNING } from '../config'
 
 /**
  * Voice-activity detection and segment capture.
@@ -55,14 +56,18 @@ export type Vad = {
 /** How far above the noise floor the signal must rise to count as speech.
  *  The floor tracks the room, so this is a ratio, not an absolute level. */
 const TRIGGER_OVER_FLOOR = 2.6
-/** While he is speaking, demand this much more, so residual echo is ignored. */
-const GUARD_BOOST = 2.4
+/** While he is speaking, demand this much more, so residual echo — and the
+ *  odd cough or "mm-hm" — is ignored. Set by VITE_BARGE_IN. */
+const GUARD_BOOST = BARGE_IN_TUNING.guardBoost
 /** Falling back below trigger×this ends the segment. Hysteresis stops a single
  *  dip mid-word from cutting a sentence in half. */
 const RELEASE_RATIO = 0.6
 
 /** Sustained energy for this long confirms speech rather than a knock or click. */
 const START_MS = 110
+/** ...and for this long while he is speaking, so only a real interruption
+ *  stops him. Set by VITE_BARGE_IN. */
+const GUARD_START_MS = BARGE_IN_TUNING.guardStartMs
 /**
  * Quiet for this long ends the SEGMENT — which is no longer the same thing as
  * ending the turn.
@@ -227,7 +232,7 @@ export async function startVad(h: VadHandlers): Promise<Vad> {
           // a blip, the recorder is discarded and nothing was lost.
           armedAt = now
           startRecorder()
-        } else if (now - armedAt >= START_MS) {
+        } else if (now - armedAt >= (guard ? GUARD_START_MS : START_MS)) {
           // Confirmed. This is the moment barge-in fires.
           speaking = true
           speechStartedAt = armedAt

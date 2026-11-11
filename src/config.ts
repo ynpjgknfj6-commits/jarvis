@@ -302,3 +302,32 @@ Using tools:
 - For anything outward-facing or destructive (sending mail, posting, paying,
   deleting) say exactly what you're about to do and wait for confirmation.
 - If you don't know, say you don't know.`
+
+/**
+ * How easily you can interrupt JARVIS while he is speaking (barge-in).
+ *
+ *   'normal' — the original tuning. Any short burst of speech over his voice
+ *     cuts him off; quick, but a cough, a "mm-hm" or a noisy room will too.
+ *   'low' — (default) you have to speak up and keep going for about half a
+ *     second, or say a few words, before he stops. Small reactions no longer
+ *     interrupt him, so a longer answer actually gets finished.
+ *   'off' — he is never interrupted by your voice alone. Saying "stop",
+ *     "wait", "Jarvis" and the like still works with the browser speech
+ *     engine; Escape always stands him down.
+ */
+export const BARGE_IN = choice(
+  'VITE_BARGE_IN',
+  import.meta.env.VITE_BARGE_IN,
+  ['normal', 'low', 'off'] as const,
+  'low',
+)
+
+/** The numbers each BARGE_IN level turns into. */
+export const BARGE_IN_TUNING = {
+  // guardBoost: how much louder than the room you must be while he speaks.
+  // guardStartMs: how long that loudness must last before it counts.
+  // guardWords: words the browser engine must hear before it believes you.
+  normal: { guardBoost: 2.4, guardStartMs: 110, guardWords: 2 },
+  low: { guardBoost: 4, guardStartMs: 450, guardWords: 4 },
+  off: { guardBoost: Infinity, guardStartMs: Infinity, guardWords: Infinity },
+}[BARGE_IN]

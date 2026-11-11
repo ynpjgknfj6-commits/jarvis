@@ -256,6 +256,7 @@ Everything is optional in bridge mode. Frontend settings live in `.env.local`
 | `VITE_BRIDGE_URL` | Where to reach the bridge |
 | `VITE_TTS_ENGINE` | `system` or `kokoro` |
 | `VITE_KOKORO_VOICE` | Voice for the Kokoro engine |
+| `VITE_BARGE_IN` | How easily your voice interrupts him: `normal`, `low` (default) or `off` |
 | `VITE_USE_ELEVENLABS` | Force the ElevenLabs voice on |
 | `VITE_ANTHROPIC_API_KEY` | Direct mode only |
 

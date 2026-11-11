@@ -1,4 +1,4 @@
-import { BRIDGE_HTTP_URL } from '../config'
+import { BARGE_IN_TUNING, BRIDGE_HTTP_URL } from '../config'
 import { getMic } from './audio'
 import { speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
@@ -740,7 +740,8 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
           // has already had a pass at; here the evidence is a transcript of
           // audio that includes his own playback, and one word of that is not
           // evidence of anything.
-          if (words < 2) return
+          // VITE_BARGE_IN raises this so a brief reaction does not stop him.
+          if (words < BARGE_IN_TUNING.guardWords) return
         }
       }
       started = true

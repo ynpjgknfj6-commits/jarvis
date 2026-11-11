@@ -311,9 +311,8 @@ Using tools:
  *   'low' — (default) you have to speak up and keep going for about half a
  *     second, or say a few words, before he stops. Small reactions no longer
  *     interrupt him, so a longer answer actually gets finished.
- *   'off' — he is never interrupted by your voice alone. Saying "stop",
- *     "wait", "Jarvis" and the like still works with the browser speech
- *     engine; Escape always stands him down.
+ *   'off' — the microphone is ignored while he is speaking and for a moment
+ *     after, so he can never hear himself. Escape stands him down.
  */
 export const BARGE_IN = choice(
   'VITE_BARGE_IN',

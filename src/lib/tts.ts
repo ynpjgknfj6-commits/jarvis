@@ -118,6 +118,15 @@ export function speakingSince(): number {
   return speaking ? speakingAt : 0
 }
 
+/** When he last finished a sentence. */
+let lastEndedAt = 0
+
+/** Milliseconds since he last stopped speaking; 0 while he is speaking. */
+export function quietFor(): number {
+  if (speaking) return 0
+  return lastEndedAt ? Date.now() - lastEndedAt : Infinity
+}
+
 function setSpeaking(text: string) {
   if (text) {
     speaking = text
@@ -126,6 +135,7 @@ function setSpeaking(text: string) {
   }
   if (speaking) {
     const now = Date.now()
+    lastEndedAt = now
     recent = recent.filter((r) => r.until > now)
     recent.push({ text: speaking, until: now + ECHO_TAIL_MS })
     if (recent.length > ECHO_HISTORY) recent = recent.slice(-ECHO_HISTORY)

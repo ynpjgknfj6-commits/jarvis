@@ -1,6 +1,6 @@
-import { BARGE_IN_TUNING, BRIDGE_HTTP_URL } from '../config'
+import { BARGE_IN, BARGE_IN_TUNING, BRIDGE_HTTP_URL } from '../config'
 import { getMic } from './audio'
-import { speakingNow, speakingSince } from './tts'
+import { quietFor, speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
 import { caps } from './capabilities'
 
@@ -296,7 +296,12 @@ const STOP = new Set(
  */
 function isEcho(heard: string, spoken: string): boolean {
   if (!spoken) return false
-  if (OVERRIDE.test(heard)) return false
+  // An override word ("stop", "wait", "no", "Jarvis") must always get through —
+  // unless he is saying it himself. He says "no" and "Jarvis" all the time, and
+  // skipping the check whenever one appeared let exactly those echoes in.
+  const overrides = heard.match(new RegExp(OVERRIDE.source, 'gi')) ?? []
+  const said = norm(spoken)
+  if (overrides.some((w) => !new RegExp(`\\b${norm(w)}\\b`).test(said))) return false
 
   const all = norm(heard).split(' ').filter(Boolean)
   if (!all.length) return true
@@ -315,6 +320,16 @@ function isEcho(heard: string, spoken: string): boolean {
   let hits = 0
   for (const w of content) if (mine.has(w)) hits++
   return hits / content.length >= 0.6
+}
+
+/**
+ * With VITE_BARGE_IN=off, ignore the microphone entirely while he is speaking
+ * and for a moment after, so nothing from the speakers can ever be taken as
+ * the user. Escape still stands him down.
+ */
+const HALF_DUPLEX_TAIL_MS = 1200
+function halfDuplexMuted(): boolean {
+  return BARGE_IN === 'off' && quietFor() < HALF_DUPLEX_TAIL_MS
 }
 
 // ---------------------------------------------------------------------------
@@ -700,6 +715,12 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     }
     const heard = `${settled}${fresh} ${interim}`.replace(/\s+/g, ' ').trim()
     if (!heard) return
+    if (halfDuplexMuted()) {
+      interim = ''
+      settled = ''
+      drop('ignored while he was speaking (VITE_BARGE_IN=off)')
+      return
+    }
     if (isEcho(`${fresh} ${interim}`, speakingNow())) {
       interim = ''
       return

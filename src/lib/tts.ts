@@ -46,12 +46,19 @@ type Speaker = {
 // ---------------------------------------------------------------------------
 
 let speaking = ''
-let recent = ''
-let recentUntil = 0
+/** Sentences he finished recently, each with the time its echo stops mattering. */
+let recent: { text: string; until: number }[] = []
 
-/** Recognition lags the speakers by a few hundred milliseconds, so a sentence
- *  keeps arriving at the microphone well after it has finished playing. */
-const ECHO_TAIL_MS = 1800
+/** Recognition lags the speakers, so a sentence keeps arriving at the
+ *  microphone well after it has finished playing. With ElevenLabs Scribe the
+ *  transcript of a segment comes back only after the segment has ended (650ms
+ *  of quiet) and the upload and transcription have run — often two or three
+ *  seconds — and one segment can span several of his sentences. 1.8s was too
+ *  short for that, and his own words came back to him as if the user had said
+ *  them. */
+const ECHO_TAIL_MS = 8000
+/** Never compare against more than this many recent sentences. */
+const ECHO_HISTORY = 8
 
 /**
  * Why you cannot hear him.
@@ -118,8 +125,10 @@ function setSpeaking(text: string) {
     return
   }
   if (speaking) {
-    recent = speaking
-    recentUntil = Date.now() + ECHO_TAIL_MS
+    const now = Date.now()
+    recent = recent.filter((r) => r.until > now)
+    recent.push({ text: speaking, until: now + ECHO_TAIL_MS })
+    if (recent.length > ECHO_HISTORY) recent = recent.slice(-ECHO_HISTORY)
   }
   speaking = ''
 }
@@ -129,12 +138,15 @@ function setSpeaking(text: string) {
  *
  * The voice loop reads this to recognise itself: the mic stays open while he
  * talks, so it hears every word he says and would otherwise treat his own
- * answer as a barge-in. Includes a short tail of the previous sentence,
- * because the gap between two sentences is exactly when the echo of the first
- * one lands. See `isEcho` in voice.ts.
+ * answer as a barge-in. Includes everything he said in the last few seconds,
+ * because the echo of a sentence lands after it has finished playing. See `isEcho` in voice.ts.
  */
 export function speakingNow(): string {
-  const tail = Date.now() < recentUntil ? recent : ''
+  const now = Date.now()
+  const tail = recent
+    .filter((r) => r.until > now)
+    .map((r) => r.text)
+    .join(' ')
   return `${speaking} ${tail}`.trim()
 }
 

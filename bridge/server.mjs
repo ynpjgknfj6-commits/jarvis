@@ -510,6 +510,12 @@ function elevenKey() {
 }
 
 const VOICE_ID = process.env.JARVIS_VOICE_ID ?? 'L1aJrPa7pLJEyYlh3Ilq'
+// George, one of ElevenLabs' built-in voices. Every plan can use it, including
+// the free one, which cannot use voices from the shared voice library.
+const FALLBACK_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'
+// Set once ElevenLabs has refused VOICE_ID for this account, so every later
+// sentence goes straight to the fallback instead of failing first.
+let voiceRefused = false
 
 /**
  * Where /file is permitted to read from, and how big a read may get.
@@ -900,8 +906,8 @@ const handleRequest = async (req, res) => {
       return res.end('no text')
     }
     try {
-      const upstream = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}/stream` +
+      const speak = (voice) => fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voice}/stream` +
           // 22kHz mono is half the bytes of 44kHz and indistinguishable through
           // a laptop speaker; optimize_streaming_latency=3 trades a little
           // prosody for a much earlier first byte.
@@ -922,6 +928,21 @@ const handleRequest = async (req, res) => {
           }),
         },
       )
+      let upstream = await speak(
+        voiceRefused && VOICE_ID !== FALLBACK_VOICE_ID ? FALLBACK_VOICE_ID : VOICE_ID,
+      )
+      // 402 is ElevenLabs saying this plan may not use the chosen voice (a
+      // shared-library voice on the free plan). Without this, every sentence
+      // fell back to the browser's own voice — which Chrome cannot echo-cancel,
+      // so the microphone heard him and fed his own words back to him.
+      if (upstream.status === 402 && !voiceRefused && VOICE_ID !== FALLBACK_VOICE_ID) {
+        voiceRefused = true
+        console.warn(
+          `[jarvis] ElevenLabs refused voice ${VOICE_ID} on this plan (402) — using the built-in George voice instead. Upgrade the ElevenLabs plan or set JARVIS_VOICE_ID to a built-in voice.`,
+        )
+        await upstream.body?.cancel()
+        upstream = await speak(FALLBACK_VOICE_ID)
+      }
       if (!upstream.ok) {
         res.writeHead(upstream.status, cors)
         return res.end(await upstream.text())

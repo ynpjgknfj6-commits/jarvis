@@ -509,7 +509,7 @@ function elevenKey() {
   }
 }
 
-const VOICE_ID = process.env.JARVIS_VOICE_ID ?? 'L1aJrPa7pLJEyYlh3Ilq'
+const VOICE_ID = process.env.JARVIS_VOICE_ID ?? 'JBFqnCBsd6RMkjVDRZzb'
 // George, one of ElevenLabs' built-in voices. Every plan can use it, including
 // the free one, which cannot use voices from the shared voice library.
 const FALLBACK_VOICE_ID = 'JBFqnCBsd6RMkjVDRZzb'

@@ -77,8 +77,16 @@ const WAKE_DEBOUNCE = 1500
  * used to be silently discarded, so the wake word "just didn't work" with no
  * indication why. Better a rare false wake than a name that does not answer.
  */
+/**
+ * His name, as transcribers actually write it.
+ *
+ * The first group counts on its own: none of these is an ordinary word. The
+ * second group are real words or names a transcriber hears for "Jarvis" ("hey
+ * Davis", "hey service"), so they count only straight after a greeting —
+ * otherwise a conversation about Miles Davis would wake him.
+ */
 const WAKE =
-  /\b(?:hey|hi|ok|okay|yo)?\s*(?:jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv)\b(?!'s)/i
+  /\b(?:(?:hey|hi|ok|okay|yo)?[\s,]*(?:jarvis|jarvys|jervis|jarvis's|travis|jarviss|java's|jarv|chavis|charvis|javis|jarvas|jarvus|jarves|jarbis|jarvish|jharvis|tarvis|garvis)|(?:hey|hi|ok|okay|yo)[\s,]+(?:davis|harvis|harvest|service|jarred|jervais|nervous|marvis|mavis|jarvi))\b(?!'s)/i
 
 /** Everything after the wake phrase, which is usually the actual command. */
 function afterWake(text: string): string {
@@ -328,8 +336,10 @@ function isEcho(heard: string, spoken: string): boolean {
  * the user. Escape still stands him down.
  */
 const HALF_DUPLEX_TAIL_MS = 1200
-function halfDuplexMuted(): boolean {
-  return BARGE_IN === 'off' && quietFor() < HALF_DUPLEX_TAIL_MS
+function halfDuplexMuted(mode: VoiceMode): boolean {
+  // Only while he is answering. His "Yes, sir?" after the wake word plays in
+  // command mode, and muting that wiped out a question asked straight over it.
+  return BARGE_IN === 'off' && mode === 'guard' && quietFor() < HALF_DUPLEX_TAIL_MS
 }
 
 // ---------------------------------------------------------------------------
@@ -715,7 +725,7 @@ function startBrowserVoice(h: VoiceHandlers): Voice {
     }
     const heard = `${settled}${fresh} ${interim}`.replace(/\s+/g, ' ').trim()
     if (!heard) return
-    if (halfDuplexMuted()) {
+    if (halfDuplexMuted(mode)) {
       interim = ''
       settled = ''
       drop('ignored while he was speaking (VITE_BARGE_IN=off)')

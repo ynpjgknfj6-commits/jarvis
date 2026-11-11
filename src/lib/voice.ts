@@ -1,4 +1,4 @@
-import { BARGE_IN, BARGE_IN_TUNING, BRIDGE_HTTP_URL } from '../config'
+import { BARGE_IN, BARGE_IN_TUNING, BRIDGE_HTTP_URL, LISTEN } from '../config'
 import { getMic } from './audio'
 import { quietFor, speakingNow, speakingSince } from './tts'
 import { startVad, type Vad } from './vad'
@@ -423,12 +423,37 @@ export async function startVoice(h: VoiceHandlers): Promise<Voice> {
     )
     return { stop: () => {}, live: () => false }
   }
-  diag.engine = caps().stt ? 'elevenlabs' : 'browser'
-  return caps().stt ? startElevenVoice(h) : startBrowserVoice(h)
+  if (!caps().stt || LISTEN === 'browser') {
+    diag.engine = 'browser'
+    return startBrowserVoice(h)
+  }
+
+  // ElevenLabs first, but never a deaf assistant: if transcription keeps
+  // failing (a refused key, an exhausted plan, audio it cannot decode), hand
+  // the microphone to the browser's own recogniser and carry on.
+  diag.engine = 'elevenlabs'
+  let current: Voice = { stop: () => {}, live: () => false }
+  let switched = false
+  current = await startElevenVoice(h, () => {
+    if (switched) return
+    switched = true
+    console.warn('[jarvis] ElevenLabs transcription keeps failing — listening with the browser instead')
+    current.stop()
+    diag.engine = 'browser'
+    current = startBrowserVoice(h)
+  })
+  return {
+    stop: () => current.stop(),
+    live: () => current.live(),
+  }
 }
 
+/** Consecutive transcription failures before switching to the browser. */
+const STT_FAILURES_BEFORE_FALLBACK = 3
+
 /** VAD + ElevenLabs Scribe. */
-async function startElevenVoice(h: VoiceHandlers): Promise<Voice> {
+async function startElevenVoice(h: VoiceHandlers, onBroken: () => void): Promise<Voice> {
+  let failures = 0
   let lastWake = 0
   let vad: Vad | null = null
 
@@ -483,10 +508,26 @@ async function startElevenVoice(h: VoiceHandlers): Promise<Voice> {
       diag.idleMs = Math.round(performance.now() - t0)
       if (!res.ok) {
         diag.restarts++
-        diag.lastError = `stt ${res.status}`
+        // Keep ElevenLabs' own explanation, not just the number: a 400 can be
+        // a bad recording, a plan limit or a refused key.
+        let why = ''
+        try {
+          const body = await res.text()
+          try {
+            const j = JSON.parse(body)
+            why = j?.detail?.message ?? j?.detail?.status ?? j?.message ?? body
+          } catch {
+            why = body
+          }
+        } catch {
+          /* no body */
+        }
+        diag.lastError = `stt ${res.status}${why ? `: ${String(why).slice(0, 160)}` : ''}`
         drop(`transcription failed (${res.status})`)
+        if (++failures >= STT_FAILURES_BEFORE_FALLBACK) onBroken()
         return
       }
+      failures = 0
       const { text } = (await res.json()) as { text?: string }
       const said = (text ?? '').trim()
       diag.lastError = ''

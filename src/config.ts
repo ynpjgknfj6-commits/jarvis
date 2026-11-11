@@ -330,3 +330,18 @@ export const BARGE_IN_TUNING = {
   low: { guardBoost: 4, guardStartMs: 450, guardWords: 4 },
   off: { guardBoost: Infinity, guardStartMs: Infinity, guardWords: Infinity },
 }[BARGE_IN]
+
+/**
+ * Who turns your speech into words.
+ *
+ *   'auto' — (default) ElevenLabs Scribe when the bridge has a key, falling
+ *     back to the browser by itself if transcription keeps failing.
+ *   'browser' — always the browser's own speech recognition (Chrome/Edge),
+ *     even with an ElevenLabs key. The voice he speaks with is unaffected.
+ */
+export const LISTEN = choice(
+  'VITE_LISTEN',
+  import.meta.env.VITE_LISTEN,
+  ['auto', 'browser'] as const,
+  'auto',
+)

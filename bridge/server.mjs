@@ -1030,8 +1030,15 @@ const handleRequest = async (req, res) => {
         body: form,
       })
       if (!upstream.ok) {
+        const detail = await upstream.text()
+        // Say why in the terminal. A bare status code here used to be all
+        // anyone saw, and ElevenLabs' message is the only thing that tells a
+        // bad key, an exhausted quota and an undecodable recording apart.
+        console.warn(
+          `[jarvis] ElevenLabs transcription failed (${upstream.status}, ${type}, ${size} bytes): ${detail.slice(0, 300)}`,
+        )
         res.writeHead(upstream.status, cors)
-        return res.end(await upstream.text())
+        return res.end(detail)
       }
       const data = await upstream.json()
       res.writeHead(200, { ...cors, 'content-type': 'application/json' })
